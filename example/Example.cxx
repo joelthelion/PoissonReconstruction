@@ -34,6 +34,8 @@
 #include <vtkSmartPointer.h>
 #include <vtkPolyDataReader.h>
 #include <vtkPolyDataWriter.h>
+#include <vtkClipPolyData.h>
+#include <vtkBox.h>
 
 #include "vtkPoissonReconstruction.h"
 
@@ -45,12 +47,18 @@ int main(int argc, char *argv[])
     cout << "1-Input file (*.vtk)" << endl;
     cout << "2-Depth" << endl;
     cout << "3-Output file (*.vtk)" << endl;
+    cout << "4-Crop result? (yes/no)" << endl;
     return EXIT_FAILURE;
     }
 
   vtkstd::string inputFileName = argv[1];  //"horsePoints.vtk";
   vtkstd::string outputFileName = argv[3]; //"horse.vtk";
   int            depth = atoi(argv[2]);
+  std::string crop;
+  if (argc < 5)
+    crop = "no";
+  else
+    crop = argv[4];
 
   vtkSmartPointer< vtkPolyDataReader > reader =
     vtkSmartPointer< vtkPolyDataReader >::New();
@@ -65,9 +73,25 @@ int main(int argc, char *argv[])
 
   vtkSmartPointer< vtkPolyDataWriter > writer =
     vtkSmartPointer< vtkPolyDataWriter >::New();
-  writer->SetInputConnection( poissonFilter->GetOutputPort() );
   writer->SetFileName( outputFileName.c_str() );
-  writer->Update();
+
+  if (crop == "yes") {
+    vtkSmartPointer<vtkBox> box = vtkSmartPointer<vtkBox>::New();
+    box->SetBounds(reader->GetOutput()->GetBounds());
+    vtkSmartPointer<vtkClipPolyData> crop_filter =
+      vtkSmartPointer<vtkClipPolyData>::New();
+    crop_filter->SetInputConnection( poissonFilter->GetOutputPort() );
+    crop_filter->InsideOutOn();
+    crop_filter->SetClipFunction(box);
+    crop_filter->Update();
+    writer->SetInputConnection( crop_filter->GetOutputPort() );
+    writer->Update();
+  }
+  else {
+    writer->SetInputConnection( poissonFilter->GetOutputPort() );
+    writer->Update();
+  }
+
 
   return EXIT_SUCCESS;
 }
